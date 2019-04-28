@@ -8,9 +8,7 @@ library(e1071)
 # *data - the data set which needs to be split
 # *k - number of folds
 #===
-#output: a list of lists including the index.
-
-
+#output: a list of lists including the index
 splitMethod1 <- function(data, k){
   data$label1 <- cut(data$x, k, labels = F)
   toReturn  <- list()
@@ -79,6 +77,21 @@ fitSVM <- function(data, features, response) {
   return(model)
 }
 
+#This function fits KNN on the data
+#===
+#inputs:
+# *train - the training dataset
+# *test - the test set
+# *features - list of features to use
+# *kNeighbors - the number of nerghbors 
+#===
+#output
+# the fitted result
+fitKNN <- function(train, test, features, kNeighbors) {
+  model <- knn(train[,features], test[,features], train[,"label"], kNeighbors)
+  return(model)
+}
+
 
 #This function calculates the CV-training_error of a classifier.
 #===
@@ -95,49 +108,47 @@ fitSVM <- function(data, features, response) {
 # *cv_loss - a vector of length k with the training loss in each k folds using
 CVgeneric <- function(classifier, splitMethod, data, features, label, k, loss) {
   
-  if (classifier == "logistic") {
-    fitFun <- fitLogistic
-  } else if (classifier == "LDA") {
-    fitFun <- fitLDA
-  } else if (classifier == "QDA") {
-    fitFun <- fitQDA
-  } else if (classifier == "SVM") {
-    fitFun <- fitSVM
-  }
-  
   folds <- splitMethod(data, k)
-  cv_loss <- rep(0, k)
+  cv_loss <- c()
   for(i in 1:k){
     train <- data[-folds[[i]], ]
     val <- data[folds[[i]], ]
     
-    model = fitFun(train, features, label)
-    
-    y_pred <- predict(model, val[,features], type = "response")
     if (classifier == "logistic") {
+      model = fitLogistic(train, features, label)
+      y_pred <- predict(model, val[,features], type = "response")
       y_pred <- round(y_pred)
-    } else if (classifier == "LDA" | classifier == "QDA") {
+      cv_loss <- c(cv_loss, loss(val[,label], y_pred))
+      
+    } else if (classifier == "LDA") {
+      model = fitLDA(train, features, label)
+      y_pred <- predict(model, val[,features], type = "response")
       y_pred <- y_pred$class
+      cv_loss <- c(cv_loss, loss(val[,label], y_pred))
+      
+    } else if (classifier == "QDA") {
+      model = fitQDA(train, features, label)
+      y_pred <- predict(model, val[,features], type = "response")
+      y_pred <- y_pred$class
+      cv_loss <- c(cv_loss, loss(val[,label], y_pred))
+      
+    } else if (classifier == "SVM") {
+      model = fitSVM(train, features, label)
+      y_pred <- predict(model, val[,features], type = "response")
+      cv_loss <- c(cv_loss, loss(val[,label], y_pred))
+      
+    } else if (classifier == "KNN") {
+      kNeighbors <- seq(3,20)
+      for (j in kNeighbors) {
+        y_pred <- fitKNN(train, val, features, j)
+        cv_loss <- c(cv_loss, loss(val[,label], y_pred))
+      }
     }
-    
-    cv_loss[i] <- loss(val[,label], y_pred)
+  }
+  
+  if (classifier == "KNN") {
+    cv_loss <- as.matrix(cv_loss, nrow = length(kNeighbors), ncol = k)
   }
   
   return(cv_loss)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
