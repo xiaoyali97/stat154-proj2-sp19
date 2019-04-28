@@ -88,7 +88,9 @@ fitSVM <- function(data, features, response) {
 #output
 # the fitted result
 fitKNN <- function(train, test, features, kNeighbors) {
-  model <- knn(train[,features], test[,features], train[,"label"], kNeighbors)
+  train_features <- scale(train[,features])
+  test_features <- scale(test[,features])
+  model <- knn(train_features, test_features, train[,"label"], kNeighbors)
   return(model)
 }
 
