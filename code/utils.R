@@ -1,30 +1,64 @@
-library(MASS)
-library(e1071)
-
-#These two functions split the entire data into folds and choose some folds 
-#to be training, validataion and test sets respectively.
+#This function create a m*n grid on the image.
 #===
 #inputs: 
-# *data - the data set which needs to be split
-# *k - number of folds
-#===
-#output: a list of lists including the index
-splitMethod1 <- function(data, k){
-  data$label1 <- cut(data$x, k, labels = F)
-  toReturn  <- list()
-  for (i in 1:k) {
-    toReturn[i] <- list(which(data$label1==i))
-  }
-  sample(toReturn)
+# *data - the whole data frame
+# *m - the dimension on y-axis
+# *n - the dimension on x-axis
+#=== 
+#outputs:
+# *data_with_grid - a dataframe with the grid_label column, which indicates the 
+#                   grid that each data point is in 
+createGrid <- function(data, m, n) {
+  grids <- matrix(seq(1,m*n), nrow = m, byrow = T)
+  xPos <- cut(data$x, n, labels = F)
+  yPos <- cut(data$y, m, labels = F)
+  data$grid_label <- mapply(function(x,y){grids[m+1-y,x]}, xPos, yPos)
+  return(data)
 }
 
-splitMethod2 <- function(data, k){
-  data$label2 <- cut(data$y, k, labels = F)
-  toReturn  <- list()
-  for (i in 1:k) {
-    toReturn[i] <- list(which(data$label2==i))
+
+#These two functions choose around 10% test data, 10% validation data and 
+#80% training data. 
+#===
+#inputs: 
+# *data - a dataframe with the grid label
+#===
+#output: a list that contains 3 lists in the order of [train, val, test]
+splitMethod1 <- function(data){
+  uniqueLabel <- unique(data$grid_label)
+  numTest <- ceiling(length(uniqueLabel) * 0.1)
+  uniqueLabel <- sample(uniqueLabel)
+  
+  test <- c()
+  val <- c()
+  train <- c()
+  for (i in uniqueLabel[1:numTest]) {
+    test <- c(test, which(data$grid_label == i))
   }
-  sample(toReturn)
+  for (i in uniqueLabel[(numTest+1):numTest*2]) {
+    val <- c(val, which(data$grid_label == i))
+  }
+  for (i in uniqueLabel[(numTest*2 + 1):length(uniqueLabel)]) {
+    train <- c(train, which(data$grid_label == i))
+  }
+  return(list(train, val, test))
+}
+
+splitMethod2 <- function(data){
+  test <- c()
+  val <- c()
+  train <- c()
+  
+  for (i in unique(data$grid_label)) {
+    currFold <- which(data$grid_label == i)
+    currFold <- sample(currFold)
+    numTest <- ceiling(length(currFold)*0.1)
+    
+    test <- c(test, currFold[1:numTest])
+    val <- c(val, currFold[(numTest+1):numTest*2])
+    train <- c(train, currFold[(numTest*2+1):length(currFold)])
+  }
+  return(list(train, val, test))
 }
 
 #loss function 
@@ -94,6 +128,28 @@ fitKNN <- function(train, test, features, kNeighbors) {
   return(model)
 }
 
+#This function create k folds
+#===
+#inputs:
+# *data - a dataframe with the grid_label column
+# *k - number of cv folds
+#=== 
+#output: a list of k elements, each contains the index in that fold
+createCVFolds <- function(data, k) {
+  uniqueLabel <- unique(data$grid_label) 
+  uniqueLabel <- sample(uniqueLabel)
+  numInCVFold <- unname(table(cut(1:length(uniqueLabel), k)))
+  prev <- 1
+  
+  toReturn <- list() 
+  for (i in 1:k) {
+    toReturn[i] <- list(which(data$grid_label %in% 
+                                uniqueLabel[prev:(prev+numInCVFold[i]-1)]))
+    prev <- prev + numInCVFold[i]
+  }
+  return(toReturn)
+}
+
 
 #This function calculates the CV-training_error of a classifier.
 #===
@@ -108,9 +164,9 @@ fitKNN <- function(train, test, features, kNeighbors) {
 #===
 #output:
 # *cv_loss - a vector of length k with the training loss in each k folds using
-CVgeneric <- function(classifier, splitMethod, data, features, label, k, loss) {
+CVgeneric <- function(classifier, data, features, label, k, loss) {
   
-  folds <- splitMethod(data, k)
+  folds <- createCVFolds(data, k)
   cv_loss <- c()
   for(i in 1:k){
     train <- data[-folds[[i]], ]
@@ -140,7 +196,7 @@ CVgeneric <- function(classifier, splitMethod, data, features, label, k, loss) {
       cv_loss <- c(cv_loss, loss(val[,label], y_pred))
       
     } else if (classifier == "KNN") {
-      kNeighbors <- seq(3,20)
+      kNeighbors <- seq(3,20,2)
       for (j in kNeighbors) {
         y_pred <- fitKNN(train, val, features, j)
         cv_loss <- c(cv_loss, loss(val[,label], y_pred))
@@ -149,7 +205,7 @@ CVgeneric <- function(classifier, splitMethod, data, features, label, k, loss) {
   }
   
   if (classifier == "KNN") {
-    cv_loss <- as.matrix(cv_loss, nrow = length(kNeighbors), ncol = k)
+    cv_loss <- matrix(cv_loss, nrow = length(kNeighbors), ncol = k)
   }
   
   return(cv_loss)
