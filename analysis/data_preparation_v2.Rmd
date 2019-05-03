@@ -1,0 +1,195 @@
+---
+title: "proj2"
+author: "Xiaoya Li"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+image1 <- read.table("../data/image1.txt")
+image2 <- read.table("../data/image2.txt")
+image3 <- read.table("../data/image3.txt")
+var_names <- c("y", "x", "label", "NDAI","SD","CORR","DF","CF","BF","AF","AN")
+colnames(image1) <- var_names
+colnames(image2) <- var_names
+colnames(image3) <- var_names
+```
+
+```{r}
+range(image1$y)
+```
+
+
+#### 1. b)
+
+```{r}
+summary(as.factor(image1$label)) / nrow(image1)
+```
+
+```{r}
+summary(as.factor(image2$label)) / nrow(image2)
+```
+
+```{r}
+summary(as.factor(image3$label)) / nrow(image3)
+```
+
+
+```{r}
+head(image2)
+```
+
+
+
+```{r}
+ggplot(image1, aes(x = x, y = y, color = as.factor(label))) +
+  geom_point() +
+  ggtitle("Image 1")
+``` 
+
+```{r}
+ggplot(image2, aes(x = x, y = y, color = as.factor(label))) +
+  geom_point() +
+  ggtitle("Image 2")
+
+```
+
+
+```{r}
+ggplot(image3, aes(x = x, y = y, color = as.factor(label))) +
+  geom_point() +
+  ggtitle("Image 3")
+```
+
+Combine all three images into one dataset. Select data that has label {1,-1}, 
+then change the label coding to {0,1}. 
+
+```{r}
+image1$image = rep(1, nrow(image1))
+image2$image = rep(2, nrow(image2))
+image3$image = rep(3, nrow(image3))
+
+allData <- rbind(image1, image2, image3)
+twoClasses <- allData[allData$label != 0,]
+twoClasses[twoClasses$label == -1,]$label <- 0
+twoClasses
+write.csv(x = twoClasses, file = "../data/all.csv", row.names = F, col.names = T)
+```
+
+ 
+
+#### 1.c)
+
+```{r}
+head(allData)
+```
+
+```{r}
+pairs(allData[,-3])
+```
+
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = NDAI, y = SD, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = SD, y = CORR, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = NDAI, y = CORR, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = NDAI, y = DF, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = SD, y = DF, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = CORR, y = DF, color = as.factor(label))) +
+  geom_point(alpha = 0.5)
+```
+
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = NDAI, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = SD, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = CORR, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = AF, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity') 
+  
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = BF, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = CF, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = DF, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+```{r}
+ggplot(allData[allData$label != 0,], aes(x = AN, fill = as.factor(label))) +
+  geom_histogram(alpha = 0.4, position = 'identity')
+```
+
+
+```{r}
+ggplot(twoClasses, aes(x = x, y = y, color = as.factor(label))) +
+  geom_point(alpha = 0.02)
+```
+
+```{r}
+linearModel <- lm(label ~ ., twoClasses[,-12])
+summary(linearModel)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

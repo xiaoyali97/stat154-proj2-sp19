@@ -1,0 +1,115 @@
+---
+title: "Analysis"
+author: "Xiaoya Li"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MASS)
+library(e1071)
+library(class)
+
+source("../code/utils.R")
+```
+
+```{r}
+all <- read.csv("../data/all.csv")
+featureList <- c("NDAI", "SD", "CORR")
+all <- createGrid(all, 4, 4)
+```
+
+
+### Split Using two method
+
+```{r}
+set.seed(9)
+folds1 <- splitMethod1(all)
+folds2 <- splitMethod2(all)
+
+trainVal1 <- all[-folds1[[3]],]
+train1 <- all[folds1[[1]],]
+val1 <- all[folds1[[2]],]
+test1 <- all[folds1[[3]],]
+
+trainVal2 <- all[-folds2[[3]],]
+train2 <- all[folds2[[1]],]
+val2 <- all[folds2[[2]],]
+test2 <- all[folds2[[3]],]
+```
+
+Trivial classifier accuracy:
+
+```{r}
+mean(val1$label == 0)
+mean(test1$label == 0)
+
+mean(val2$label == 0)
+mean(test2$label == 0)
+```
+
+### KNN with cross validation
+
+```{r}
+set.seed(30)
+cv_loss1 <- CVgeneric("KNN", trainVal1, featureList, "label", 5, misclassification)
+```
+
+```{r}
+cv_loss1
+```
+
+```{r}
+apply(cv_loss1, 1, mean)
+```
+
+Model with 10 neighbors performs the best. 
+
+```{r}
+#save the cv_loss1 into R object since it takes couple hours to run
+saveRDS(cv_loss1, file =  "knn_loss1.rds")
+```
+
+```{r}
+cv_loss1 <- readRDS("knn_loss1.rds")
+1 - cv_loss1
+```
+
+
+```{r}
+knn_test1_pred <- fitKNN(trainVal1, test1, featureList, 11)
+knn_test1_error <- misclassification(test1["label"], as.numeric(knn_test1_pred))
+knn_test1_error
+```
+
+```{r}
+set.seed(35)
+cv_loss2 <- CVgeneric("KNN", trainVal2, featureList, "label", 5, misclassification)
+```
+
+```{r}
+apply(cv_loss2, 1, mean)
+```
+
+
+```{r}
+saveRDS(cv_loss2, file =  "knn_loss2.rds")
+cv_loss2 <- readRDS("knn_loss2.rds")
+```
+
+```{r}
+1-cv_loss2
+```
+
+
+```{r}
+knn_test2_pred <- fitKNN(trainVal2, test2, featureList, 19)
+knn_test2_error <- misclassification(test2["label"], as.numeric(knn_test2_pred))
+1 - knn_test2_error
+```
+
+
+

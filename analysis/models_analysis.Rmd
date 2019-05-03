@@ -1,0 +1,469 @@
+---
+title: "Analysis"
+author: "Xiaoya Li"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MASS)
+library(e1071)
+library(ROCR)
+library(plotROC)
+library(hmeasure)
+library(ggplot2)
+library(class)
+
+source("../code/utils.R")
+```
+
+```{r}
+all <- read.csv("../data/all.csv")
+all <- createGrid(all, 4,4)
+#unique(all$grid_label)
+```
+
+
+####1.c)
+```{r}
+ggplot(all, aes(x=factor(0), y=x, fill=as.factor(label))) +
+  geom_boxplot()
+ggplot(all, aes(x=factor(0), y=y, fill=as.factor(label))) +
+  geom_boxplot()
+ggplot(all, aes(x=factor(0), y=NDAI, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on NDAI")
+ggsave("label based on NDAI.png")
+ggplot(all, aes(x=factor(0), y=SD, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on SD")
+ggsave("label based on SD.png")
+ggplot(all, aes(x=factor(0), y=CORR, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on CORR")
+ggsave("label based on CORR.png")
+ggplot(all, aes(x=factor(0), y=DF, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on DF")
+ggsave("label based on DF.png")
+ggplot(all, aes(x=factor(0), y=CF, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on CF")
+ggsave("label based on CF.png")
+ggplot(all, aes(x=factor(0), y=BF, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on BF")
+ggsave("label based on BF.png")
+ggplot(all, aes(x=factor(0), y=AF, fill=as.factor(label))) +
+  geom_boxplot()+
+  ggtitle("Label based on AF")
+ggsave("label based on AF.png")
+ggplot(all, aes(x=factor(0), y=AN, fill=as.factor(label))) +
+  geom_boxplot() +
+  ggtitle("Label based on AN")
+ggsave("label based on AN.png")
+
+```
+```{r}
+png("./cor.png")
+pairs(all[,4:7], main="Pair Plots of NDAI, SD, CORR, and DF")
+dev.off
+```
+
+
+
+####3.a)
+```{r}
+set.seed(12345)
+folds1 <- splitMethod1(all)
+folds2 <- splitMethod2(all)
+test1 <- all[folds1[[3]],]
+test2 <- all[folds2[[3]],]
+
+train1 <- all[folds1[[1]],]
+train2 <- all[folds2[[1]],]
+
+val1 <- all[folds1[[2]],]
+val2 <- all[folds2[[2]],]
+
+tra.val1 <-  all[-folds1[[3]],]
+tra.val2 <-  all[-folds2[[3]],]
+
+```
+
+
+
+
+```{r}
+#logistic regression
+set.seed(12345)
+features <- c("NDAI","SD","CORR")
+labels <- c("label")
+
+LRError1 <- CVgeneric("logistic", tra.val1, features, labels, 5, misclassification)
+LRError2 <- CVgeneric("logistic", tra.val2, features, labels, 5, misclassification)
+1-LRError1
+1-LRError2
+c(1-mean(LRError1), 1-mean(LRError2))
+```
+
+```{r}
+lr.prob1 <- predict(fitLogistic(tra.val1, features, labels), test1, type="response")
+lr.pred1 <- rep(0, length(lr.prob1))
+lr.pred1[lr.prob1>0.5] <- 1
+mean(lr.pred1==test1$label)
+
+lr.prob2 <- predict(fitLogistic(tra.val2, features, labels), test2, type="response")
+lr.pred2 <- rep(0, length(lr.prob2))
+lr.pred2[lr.prob2>0.5] <- 1
+mean(lr.pred2==test2$label)
+```
+
+```{r}
+#LDA
+set.seed(12345)
+LDAError1 <- CVgeneric("LDA", tra.val1, features, labels, 5, misclassification)
+LDAError2 <- CVgeneric("LDA", tra.val2, features, labels, 5, misclassification)
+1-LDAError1
+1-LDAError2
+c(1-mean(LDAError1), 1-mean(LDAError2))
+```
+
+```{r}
+lda.pred1 <- predict(fitLDA(tra.val1, features, labels), test1, type="response")
+lda.class1 <- lda.pred1$class
+mean(lda.class1==test1$label)
+
+lda.pred2 <- predict(fitLDA(tra.val2, features, labels), test2, type="response")
+lda.class2 <- lda.pred2$class
+mean(lda.class2==test2$label)
+```
+
+
+```{r}
+#QDA
+set.seed(12345)
+QDAError1 <- CVgeneric("QDA", tra.val1, features, labels, 5, misclassification)
+QDAError2 <- CVgeneric("QDA", tra.val2, features, labels, 5, misclassification)
+1-QDAError1
+1-QDAError2
+c(1-mean(QDAError1), 1-mean(QDAError2))
+```
+
+```{r}
+qda.pred1 <- predict(fitQDA(tra.val1, features, labels), test1, type="response")
+qda.class1 <- qda.pred1$class
+mean(qda.class1==test1$label)
+
+qda.pred2 <- predict(fitQDA(tra.val2, features, labels), test2, type="response")
+qda.class2 <- qda.pred2$class
+mean(qda.class2==test2$label)
+```
+
+```{r}
+#KNN
+knn.pred1 <- knn(scale(tra.val1[,features]), scale(test1[,features]), tra.val1[,"label"], 11, prob = TRUE)
+
+scores.knn <- attr(knn.pred1,"prob")
+scores.knn[knn.pred1==0] <- 1-scores.knn[knn.pred1==0]
+```
+
+
+####3.b)
+```{r}
+lr.perf1 <- performance(prediction(lr.prob1, test1$label), "tpr", "fpr")
+lr.perf2 <- performance(prediction(lr.prob2, test2$label), "tpr", "fpr")
+lda.perf1 <- performance(prediction(lda.pred1$posterior[,2], test1$label), "tpr", "fpr")
+lda.perf2 <- performance(prediction(lda.pred2$posterior[,2], test2$label), "tpr", "fpr")
+qda.perf1 <- performance(prediction(qda.pred1$posterior[,2], test1$label), "tpr", "fpr")
+qda.perf2 <- performance(prediction(qda.pred2$posterior[,2], test2$label), "tpr", "fpr")
+knn.perf1 <- performance(prediction(scores.knn, test1$label), "tpr", "fpr")
+
+
+
+png("./ROC.png")
+plot(lr.perf1, main="ROC", col=1)
+plot(lda.perf1, add=TRUE, col=2)
+plot(qda.perf1, add=TRUE, col=3)
+plot(knn.perf1, add=TRUE, col=4)
+abline(a=0,b=1, lty=3, col="grey")
+legend(0.6, 0.25, c("Logistic Regression", "LDA", "QDA", "KNN"),1:4)
+abline(v=0.0111, lty=3, col="purple")
+dev.off
+```
+
+```{r}
+#it might be a good cutoff when the false positive rate is 0.011 based on the ROC Cruve
+which(round(as.numeric(unlist(qda.perf1@x.values)), digits = 4) == 0.0111)
+unlist(qda.perf1@alpha.values)[8932]
+```
+
+
+
+####3.c)
+```{r}
+featuresadd <- c(features, "DF")
+```
+
+```{r}
+#QDA
+set.seed(12345)
+QDAErroradd <- CVgeneric("QDA", tra.val1, featuresadd, labels, 5, misclassification)
+1-QDAErroradd
+mean(1-QDAErroradd)
+```
+
+```{r}
+qda.predadd <- predict(fitQDA(tra.val1, featuresadd, labels), test1, type="response")
+qda.classadd <- qda.predadd$class
+mean(qda.classadd==test1$label)
+c(mean(qda.classadd==test1$label),mean(qda.class1==test1$label))
+```
+```{r}
+
+qda.perfadd <- performance(prediction(qda.predadd$posterior[,2], test1$label), "tpr", "fpr")
+
+png("./ROC of features with DF.png")
+plot(qda.perfadd, main="ROC of features with DF", col=1)
+plot(qda.perf1, add=TRUE, col=2)
+legend(0.6, 0.25, c("with DF", "without DF"),1:2)
+abline(a=0,b=1, lty=3, col="grey")
+dev.off
+```
+
+
+
+
+####4.b)
+```{r}
+#QDA
+set.seed(12345)
+QDAError <- CVgeneric("QDA", train1, features, labels, 5, misclassification)
+1-QDAError
+```
+
+
+```{r}
+qda.allpred <- predict(fitQDA(train1, features, labels), all, type="response")
+qda.allclass <- qda.allpred$class
+mean(qda.allclass==all$label)
+mis <- all[which(qda.allclass!=all$label),]
+sum(mis$label==1)
+sum(mis$label==0)
+```
+
+
+
+```{r}
+summary(all[which(all$label==0),4])
+summary(all[which(all$label==1),4])
+summary(mis[which(mis$label==0),4])
+summary(mis[which(mis$label==1),4])
+```
+```{r}
+summary(all[which(all$label==0),5])
+summary(all[which(all$label==1),5])
+summary(mis[which(mis$label==0),5])
+summary(mis[which(mis$label==1),5])
+```
+```{r}
+summary(all[which(all$label==0),6])
+summary(all[which(all$label==1),6])
+summary(mis[which(mis$label==0),6])
+summary(mis[which(mis$label==1),6])
+```
+
+
+```{r}
+ggplot(mis, aes(x=x, y=y, color=factor(label))) +
+  geom_point(alpha = 0.2)
+```
+
+
+
+
+```{r}
+all$group <- "all"
+mis$group <- "misclassification"
+plot.data <- rbind(all, mis)
+ggplot(plot.data, aes(x=factor(label), y=SD, fill=group)) +
+  geom_boxplot() +
+#   +geom_hline(yintercept=2)
+  ggtitle("Misclassification Error on SD")
+#ggsave("Misclassification Error on SD.png")
+
+
+ggplot(plot.data, aes(x=factor(label), y=NDAI, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=1.4) +
+  ggtitle("Misclassification Error on NDAI")
+#ggsave("Misclassification Error on NDAI.png")
+
+ggplot(plot.data, aes(x=factor(label), y=CORR, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=0.75) +
+  ggtitle("Misclassification Error on CORR")
+#ggsave("Misclassification Error on CORR.png")
+```
+
+####4.d)
+```{r}
+qda.allpred2 <- predict(fitQDA(train2, features, labels), all, type="response")
+qda.allclass2 <- qda.allpred2$class
+mean(qda.allclass2==all$label)
+mis2 <- all[which(qda.allclass2!=all$label),]
+sum(mis2$label==1)
+sum(mis2$label==0)
+```
+
+
+
+```{r}
+summary(all[which(all$label==0),4])
+summary(mis2[which(mis2$label==0),4])
+summary(all[which(all$label==1),4])
+summary(mis2[which(mis2$label==1),4])
+```
+```{r}
+summary(all[which(all$label==0),5])
+summary(mis2[which(mis2$label==0),5])
+summary(all[which(all$label==1),5])
+summary(mis2[which(mis2$label==1),5])
+```
+```{r}
+summary(all[which(all$label==0),6])
+summary(mis2[which(mis2$label==0),6])
+summary(all[which(all$label==1),6])
+summary(mis2[which(mis2$label==1),6])
+```
+
+
+```{r}
+ggplot(mis2, aes(x=x, y=y, color=factor(label))) +
+  geom_point(alpha = 0.2)
+```
+```{r}
+all$group <- "all"
+mis2$group <- "misclassification"
+plot.data <- rbind(all, mis2)
+ggplot(plot.data, aes(x=factor(label), y=SD, fill=group)) +
+  geom_boxplot() +
+#   +geom_hline(yintercept=2)
+  ggtitle("Misclassification Error of method 2 on SD")
+ggsave("Misclassification Error on SD.png")
+
+
+ggplot(plot.data, aes(x=factor(label), y=NDAI, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=1.4) +
+  ggtitle("Misclassification of method 2 Error on NDAI")
+ggsave("Misclassification Error on NDAI.png")
+
+ggplot(plot.data, aes(x=factor(label), y=CORR, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=0.75) +
+  ggtitle("Misclassification Error of method 2 on CORR")
+ggsave("Misclassification Error on CORR.png")
+```
+
+
+
+
+
+
+
+
+
+```{r}
+qda.trapred <- predict(fitQDA(train1, features, labels), train1, type="response")
+qda.traclass <- qda.trapred$class
+mean(qda.traclass==train1$label)
+mis.train <- train1[which(qda.traclass!=train1$label),]
+```
+```{r}
+qda.valpred <- predict(fitQDA(train1, features, labels), val1, type="response")
+qda.valclass <- qda.valpred$class
+mean(qda.valclass==val1$label)
+mis.val <- val1[which(qda.valclass!=val1$label),]
+```
+```{r}
+qda.tespred <- predict(fitQDA(train1, features, labels), test1, type="response")
+qda.tesclass <- qda.tespred$class
+mean(qda.tesclass==test1$label)
+mis.tes <- test1[which(qda.tesclass!=test1$label),]
+```
+```{r}
+summary(all[which(all$label==0),5])
+summary(mis.all[which(mis.all$label==0),5])
+summary(all[which(all$label==1),5])
+summary(mis.all[which(mis.all$label==1),5])
+
+summary(all[which(all$label==0),5])
+summary(mis.all[which(mis.all$label==0),5])
+summary(all[which(all$label==1),5])
+summary(mis.all[which(mis.all$label==1),5])
+```
+
+
+```{r}
+mis.all <- rbind(mis.train,mis.val,mis.tes)
+sum(mis.all$label==1)
+sum(mis.all$label==0)
+```
+```{r}
+all$group <- "all"
+mis.all$group <- "misclassification"
+plot.data <- rbind(all, mis.all)
+ggplot(plot.data, aes(x=factor(label), y=SD, fill=group)) +
+  geom_boxplot() +
+#   +geom_hline(yintercept=2)
+  ggtitle("Misclassification Error on SD")
+#ggsave("Misclassification Error on SD.png")
+
+
+ggplot(plot.data, aes(x=factor(label), y=NDAI, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=1.4) +
+  ggtitle("Misclassification Error on NDAI")
+#ggsave("Misclassification Error on NDAI.png")
+
+ggplot(plot.data, aes(x=factor(label), y=CORR, fill=group)) +
+  geom_boxplot() +
+#  geom_hline(yintercept=0.75) +
+  ggtitle("Misclassification Error on CORR")
+#ggsave("Misclassification Error on CORR.png")
+
+#AF & AN:
+##when it is smaller, its label might have more possible to be 1
+#when it is larger, its label might have more possible to be 0
+#but do not have obvious boundary
+ggplot(plot.data, aes(x=factor(label), y=AF, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=AN, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=DF, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=CF, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=BF, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=x, fill=group)) +
+  geom_boxplot()
+
+ggplot(plot.data, aes(x=factor(label), y=y, fill=group)) +
+  geom_boxplot()
+
+#when the y is smaller(<100), its label might have more possible to be 1
+#when y is larger(>250), its label might have more possible to be 0
+ggplot(plot.data, aes(x=factor(label), y=factor(grid_label), fill=group)) +
+  geom_boxplot()
+
+```
