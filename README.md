@@ -1,4 +1,5 @@
 # stat154-proj2-sp19
+Author: Xiaoya Li (3033286791), Shiyun Huang (3033203799)
 
 ### Step to reproduce this project
 1. Clone this repository
